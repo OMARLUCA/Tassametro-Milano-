@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Tassametro</title>
+<style>
+:root{
+ --bg:#f3f5f7;--card:#ffffff;--line:#d5dbe1;--txt:#14191f;--txt2:#48535f;--txt3:#6b7682;--acc:#ffd400;--ok:#1a7f37;--warn:#9a6700;--bad:#cf222e;--field:#ffffff;
+ --tag:#e8ecf0;--tagw-bg:rgba(154,103,0,.14);--tagw:#7d5200;--tagb-bg:rgba(9,105,218,.12);--tagb:#0b5cad;--r:12px;
+ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+ --bg:#0d1117;--card:#161b22;--line:#2b323b;--txt:#e8edf3;--txt2:#9aa7b4;--txt3:#66707c;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--field:#0d1117;
+ --tag:#21262e;--tagw-bg:rgba(210,153,34,.18);--tagw:#e8b339;--tagb-bg:rgba(88,166,255,.15);--tagb:#79b8ff}}
+:root[data-theme="dark"]{
+ --bg:#0d1117;--card:#161b22;--line:#2b323b;--txt:#e8edf3;--txt2:#9aa7b4;--txt3:#66707c;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--field:#0d1117;
+ --tag:#21262e;--tagw-bg:rgba(210,153,34,.18);--tagw:#e8b339;--tagb-bg:rgba(88,166,255,.15);--tagb:#79b8ff}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;max-width:620px;margin:0 auto;padding:16px 14px 40px}
+header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;gap:8px}
+h1{font-size:17px;font-weight:600}
+header span{font-size:12px;color:var(--txt3);text-align:right}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.grid3{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--txt3)}
+select{font:inherit;font-size:14px;color:var(--txt);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px}
+.lcd .imp{font-size:44px;font-weight:700;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+.lcd .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px}
+.tags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;padding-top:10px}
+.tag{border-radius:6px;padding:2px 8px;font-size:12px;background:var(--tag);color:var(--txt2)}
+.tag.w{background:var(--tagw-bg);color:var(--tagw)}
+.tag.b{background:var(--tagb-bg);color:var(--tagb)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.stats div{font-size:12px;color:var(--txt3)}
+.stats b{display:block;font-size:15px;color:var(--txt);font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.hint{font-size:12px;color:var(--txt3);margin-top:10px}
+.modes{display:flex;gap:6px;margin-bottom:10px}
+.chip{border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:13px;color:var(--txt2);background:transparent;cursor:pointer}
+.chip.on{background:var(--txt);color:var(--bg);border-color:var(--txt);font-weight:600}
+.chips5{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+input[type=range]{width:100%;accent-color:var(--txt);height:28px}
+.rowflex{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.kmh{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.gpsrow{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--txt2);margin-top:6px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--txt3);flex:none}
+.tgl{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--txt2)}
+.tgl input{accent-color:var(--acc);width:16px;height:16px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:11px 16px;background:transparent;color:var(--txt);font-size:15px;font-weight:600;cursor:pointer}
+.btn.p{background:var(--acc);color:#111;border-color:var(--acc)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn svg{flex:none}
+.rrow{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;gap:12px}
+.rrow span{color:var(--txt2)}
+.rrow .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rtot{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:8px;padding-top:10px}
+.rtot b{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.hidden{display:none!important}
+details{font-size:12px;color:var(--txt3);line-height:1.6}
+details summary{cursor:pointer;color:var(--txt2);margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<header><h1>Tassametro Milano</h1><span>tariffe luglio 2024 · solo corse a tassametro</span></header>
+
+<div class="card"><div class="grid3">
+  <label class="f">Tariffa
+    <select id="tariffa"><option value="t1">1 · convenzionale</option><option value="tc">C · collettiva</option></select></label>
+  <label class="f">Fascia oraria
+    <select id="fascia"><option value="auto">Auto</option><option value="f">Feriale 6–21</option><option value="fe">Festivo 6–21</option><option value="n">Notturna 21–6</option></select></label>
+  <label class="f">Aeroporto
+    <select id="aero"><option value="no">No</option><option value="si">Sì · minimo</option></select></label>
+</div></div>
+
+<div class="card lcd">
+  <div class="top">
+    <div class="imp num" id="importo">€ 0,00</div>
+    <div class="tags" id="stato"></div>
+  </div>
+  <div class="stats">
+    <div>Distanza<b id="km">0,00 km</b></div>
+    <div>Durata<b id="dur">0:00</b></div>
+    <div>Sosta/lento<b id="sosta">0:00</b></div>
+    <div>Scatti<b id="scatti">0</b></div>
+  </div>
+  <div class="hint" id="scattoInfo">1 scatto ogni 75,75 m sopra 26,1 km/h o 10,44 s sotto</div>
+</div>
+
+<div class="card">
+  <div class="modes">
+    <button class="chip on" id="mGps">GPS reale</button>
+    <button class="chip" id="mSim">Velocità simulata</button>
+  </div>
+  <div id="gpsBox">
+    <div class="rowflex"><span class="hint" style="margin:0">Velocità GPS</span><b class="kmh num" id="gpsV">— km/h</b></div>
+    <div class="gpsrow">
+      <span class="dot" id="dot"></span><span id="gpsStatus">In attesa di segnale…</span>
+      <span id="gpsAcc" class="num" style="margin-left:auto"></span>
+    </div>
+    <div class="gpsrow" style="margin-top:8px;flex-wrap:wrap">
+      <label class="tgl"><input type="checkbox" id="cDead" checked> stima nei buchi di segnale</label>
+    </div>
+    <div class="hint" id="diag" style="margin-top:8px">—</div>
+  </div>
+  <div id="simBox" class="hidden">
+    <div class="rowflex"><span class="hint" style="margin:0">Velocità</span><b class="kmh num" id="vlabel">30 km/h</b></div>
+    <input type="range" id="vel" min="0" max="130" value="30" step="1">
+    <div class="chips5">
+      <button class="chip" data-v="0">Sosta</button>
+      <button class="chip on" data-v="30">Città 30</button>
+      <button class="chip" data-v="60">Tangenziale 60</button>
+      <button class="chip" data-v="90">Extraurbano 90</button>
+      <button class="chip" data-v="110">Autostrada 110</button>
+    </div>
+  </div>
+</div>
+
+<div class="card btns">
+  <button class="btn p" id="bAvvia"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>Avvia corsa</button>
+  <button class="btn" id="bPausa" disabled>Pausa</button>
+  <button class="btn" id="bFine" disabled>Fine corsa</button>
+  <button class="btn" id="bWake">Schermo sempre attivo</button>
+</div>
+
+<div id="ricevuta" class="card hidden"></div>
+
+<details><summary>Note sulle tariffe</summary>
+Tariffa C: attivabile su richiesta all'inizio della corsa, per un minimo di tre persone con identico punto di partenza.
+1ª progressione: al raggiungimento di € 17,35 (Tariffa 1) o € 6,94 (Tariffa C) a tassametro.
+2ª progressione: velocità superiore a 50 km/h per più di 60 secondi; si annulla al di sotto dei 50 km/h.
+Sosta di attesa su richiesta: fino a 1 ora, deposito anticipato di € 34,48 (Tariffa 1).
+Tariffa minima da Malpensa, Linate o Orio al Serio: € 16,00 (Tariffa 1) · € 6,40 (Tariffa C). Importo esclusi pedaggi autostradali.
+Come un tassametro fisico: sotto la velocità di cambio (circa 26 km/h) conta il tempo, sopra conta i metri; 1 scatto ogni 75,75 m oppure 10,44 s (Tariffa 1).
+Ogni fix GPS è datato al suo orario e l'importo è proiettato all'istante attuale, compensando il ritardo di consegna. Nei buchi di segnale si stima con l'ultima velocità nota e al rientro il tratto viene ricalcolato senza contarlo due volte.
+</details>
+
+<script>
+/* ---------- tariffe ---------- */
+const T={
+ t1:{name:'Tariffa 1',scatto:.10,start:{f:4.10,fe:6.60,n:7.90},thr:17.35,air:16.00},
+ tc:{name:'Tariffa C',scatto:.04,start:{f:1.64,fe:2.64,n:3.16},thr:6.94,air:6.40}};
+// costanti del tassametro: metri e secondi per scatto (base, 1ª, 2ª progressione)
+const SC=[{m:75.75,s:10.44},{m:50.50,s:6.96},{m:44.44,s:6.96}];
+
+/* ---------- parametri del motore GPS ---------- */
+const V_STOP=.5,V_MOVE=.8; // m/s: isteresi fermo/in marcia sul Doppler (≈1,8 e 2,9 km/h)
+const ACC_POS=50;      // m: oltre, la posizione non è affidabile (si usa solo il Doppler)
+const V_JUMP=70;       // m/s: oltre, il salto di posizione è impossibile e il fix viene scartato
+const GAP_S=2.5;       // s senza fix prima di segnalare "stima"
+const EXTRAP_MAX=45;   // s massimi di proiezione con l'ultima velocità
+const ANCHOR_KM=.06;   // baseline (km) dopo cui si rinnova l'ancora di controllo
+const LAG_MAX=20;      // s: ritardo massimo di consegna che si compensa
+
+const $=id=>document.getElementById(id);
+const fmt=n=>'€ '+n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtT=sec=>{sec=Math.floor(sec);const m=Math.floor(sec/60),s=sec%60;return m+':'+String(s).padStart(2,'0');};
+const fmtK=n=>n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+/* ---------- fascia oraria e festivi ---------- */
+function easter(y){const a=y%19,b=y/100|0,c=y%100,d=b/4|0,e=b%4,f=(b+8)/25|0,g=(b-f+1)/3|0,h=(19*a+b-d-g+15)%30,i=c/4|0,k=c%4,l=(32+2*e+2*i-h-k)%7,m=(a+11*h+22*l)/451|0;return[(h+l-7*m+114)/31|0,(h+l-7*m+114)%31+1];}
+const FH=[[1,1],[6,1],[25,4],[1,5],[2,6],[15,8],[1,11],[7,12],[8,12],[25,12],[26,12]]; // [giorno, mese]
+// data e ora di Roma, qualunque sia il fuso impostato sul telefono
+function romeNow(dt){
+ const o={};new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',hourCycle:'h23',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'}).formatToParts(dt||new Date()).forEach(x=>o[x.type]=x.value);
+ const y=+o.year,m=+o.month,d=+o.day;
+ return{y,m,d,h:(+o.hour%24)+ +o.minute/60,dow:new Date(Date.UTC(y,m-1,d)).getUTCDay()};
+}
+function isFestivo(n){ // n: {y,m,d,dow}
+ if(n.dow===0)return true;
+ if(FH.some(([g,m])=>g===n.d&&m===n.m))return true;
+ const[em,ed]=easter(n.y),mo=new Date(Date.UTC(n.y,em-1,ed)+864e5); // Pasqua e Pasquetta
+ return(n.m===em&&n.d===ed)||(n.m===mo.getUTCMonth()+1&&n.d===mo.getUTCDate());
+}
+function autoBand(n){n=n||romeNow();if(n.h>=21||n.h<6)return'n';return isFestivo(n)?'fe':'f';}
+const BL={f:'Feriale (6–21)',fe:'Festivo (6–21)',n:'Notturna (21–6)'};
+const BS={f:'feriale',fe:'festivo',n:'notturna'};
+// la voce Auto mostra la fascia che il tassametro userebbe adesso
+function refreshAuto(){$('fascia').options[0].textContent='Auto · '+BS[autoBand()];}
+
+/* ---------- stato ---------- */
+let S=null,mode='gps',watchId=null,wakeLock=null,simKmh=30;
+const G={last:null,anchor:null,kmA:0,moving:false,v:0,vs:null,aLast:0,hist:[],ign:0,lag:0,lagWin:[]};
+const D={arr:[],lag:null,maxGap:0,gaps:0};
+
+try{const s=JSON.parse(localStorage.getItem('txcfg')||'{}');if(s.t)$('tariffa').value=s.t;if(s.a)$('aero').value=s.a;}catch(e){}
+function saveCfg(){try{localStorage.setItem('txcfg',JSON.stringify({t:$('tariffa').value,a:$('aero').value}));}catch(e){}}
+['tariffa','fascia','aero'].forEach(id=>$(id).onchange=saveCfg);
+
+/* ---------- tassametro (regole di un tassametro fisico) ---------- */
+function dispOf(X){const t=T[X.t];return Math.floor(X.eur/t.scatto+1e-6)*t.scatto;}
+function progOf(X){return dispOf(X)>=T[X.t].thr?1:0;}
+function vcambio(pr){return SC[pr].m/SC[pr].s*3.6;} // km/h: velocità di cambio tempo/metri
+
+/* Fa avanzare il tassametro X di dt secondi in cui il veicolo ha percorso km.
+   Sotto la velocità di cambio conta il tempo, sopra i metri (2ª progressione: >50 km/h per >60 s). */
+function advance(X,dt,km){
+ if(!(dt>0))return;
+ const t=T[X.t],kmh=km/dt*3600;
+ if(kmh>50){X.t50+=dt;if(X.t50>60)X.p2=true;}else{X.t50=0;X.p2=false;}
+ const pr=progOf(X),k=X.p2?2:pr;
+ X.km+=km;
+ if(kmh<vcambio(pr)){X.eur+=t.scatto*dt/SC[pr].s;X.waitT+=dt;}
+ else X.eur+=t.scatto*km*1000/SC[k].m;
+}
+
+/* ---------- tempo dei fix e latenza ---------- */
+// "adesso" sulla scala dei fix: orario dell'ultimo fix + tempo trascorso dalla sua consegna + il suo ritardo di consegna
+function gpsNow(){return G.last.t+(performance.now()-G.aLast)+G.lag*1000;}
+
+// Stato da mostrare = stato consolidato dai fix + coda proiettata fino a "adesso" con l'ultima velocità.
+// La coda si ricalcola a ogni schermata: un fix in ritardo, in raffica o mancante la sostituisce senza salti.
+function view(){
+ const X=Object.assign({},S);X.tailKm=0;X.tailDt=0;
+ if(mode==='gps'&&S.running&&!S.paused&&G.last){
+  const dt=Math.min((gpsNow()-S.tc)/1000,$('cDead').checked?EXTRAP_MAX:GAP_S);
+  if(dt>0){const km=(G.moving?G.v:0)*dt/1000;advance(X,dt,km);X.tailKm=km;X.tailDt=dt;}
+ }
+ // un tassametro non torna mai indietro
+ if(X.eur<S.hEur)X.eur=S.hEur;else S.hEur=X.eur;
+ if(X.km<S.hKm)X.km=S.hKm;else S.hKm=X.km;
+ if(X.waitT<S.hW)X.waitT=S.hW;else S.hW=X.waitT;
+ return X;
+}
+function commitTail(){ // consolida la coda nello stato (pausa, fine corsa)
+ const X=view();
+ if(X.tailDt>0){if((performance.now()-G.aLast)/1000>GAP_S)X.dead+=X.tailKm;X.tc=gpsNow();}
+ X.hEur=X.eur;X.hKm=X.km;X.hW=X.waitT;
+ S=X;
+}
+
+/* ---------- geometria ---------- */
+function hav(a,b,c,d){const R=6371,r=x=>x*Math.PI/180,dLa=r(c-a),dLo=r(d-b),h=Math.sin(dLa/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h));} // km
+
+/* ---------- schermo ---------- */
+function render(){
+ if(!S)return;const X=view(),t=T[S.t],disp=dispOf(X),pr=progOf(X);
+ $('importo').textContent=fmt(disp);
+ $('km').textContent=fmtK(X.km)+' km';
+ $('dur').textContent=fmtT(S.elapsed);$('sosta').textContent=fmtT(X.waitT);$('scatti').textContent=Math.round(disp/t.scatto);
+ let h='<span class="tag">'+BL[S.band]+' · '+t.name+'</span>';
+ if(X.p2)h+='<span class="tag w">2ª progressione · >50 km/h</span>';
+ else if(pr)h+='<span class="tag b">1ª progressione</span>';
+ else h+='<span class="tag">Tariffa base</span>';
+ if(mode==='gps'&&S.running&&G.last&&(performance.now()-G.aLast)/1000>GAP_S)h+='<span class="tag w">stima: nessun fix</span>';
+ $('stato').innerHTML=h;
+ const k=X.p2?2:pr;
+ $('scattoInfo').textContent='1 scatto da '+fmt(t.scatto)+' ogni '+SC[k].m.toLocaleString('it-IT')+' m sopra '+vcambio(pr).toLocaleString('it-IT',{maximumFractionDigits:1})+' km/h o '+SC[pr].s.toLocaleString('it-IT')+' s sotto';
+}
+
+/* ---------- ciclo a 100 ms ---------- */
+function tick(){
+ if(!S||!S.running)return;
+ const now=performance.now();
+ if(S.paused){S.last=now;return;}
+ S.elapsed=(now-S.t0-S.pausedMs)/1000;
+ if(mode==='sim'){const dt=(now-S.last)/1000;S.last=now;advance(S,dt,simKmh/3600*dt);}
+ else gapStatus(now);
+ render();
+}
+setInterval(tick,100);
+
+function gapStatus(now){
+ if(!G.last)return;
+ const wall=(now-G.aLast)/1000;
+ if(wall<=GAP_S)return;
+ $('dot').style.background=wall>EXTRAP_MAX?'var(--bad)':'var(--warn)';
+ $('gpsStatus').textContent=wall>EXTRAP_MAX?'Segnale perso da '+Math.round(wall)+' s':'Nessun fix da '+Math.round(wall)+' s: stima in corso';
+}
+
+/* ---------- GPS ---------- */
+// Ritardo di consegna del fix. Se l'orologio del telefono è allineato ai fix è la differenza diretta;
+// se è sfasato si usa solo il ritardo in più rispetto al solito.
+function updLag(f){
+ const raw=(Date.now()-f.t)/1000;
+ G.lagWin.push(raw);if(G.lagWin.length>30)G.lagWin.shift();
+ const mn=Math.min(...G.lagWin);
+ const lag=(mn>-1&&mn<4)?Math.max(0,raw):.4+Math.max(0,raw-mn);
+ G.lag=Math.min(lag,LAG_MAX);
+ D.lag=D.lag==null?G.lag:D.lag*.7+G.lag*.3;
+}
+function diagFix(f){
+ D.arr.push(f.a);while(D.arr.length&&f.a-D.arr[0]>10000)D.arr.shift();
+ if(G.last){const g=(f.t-G.last.t)/1000;if(g>GAP_S){D.gaps++;if(g>D.maxGap)D.maxGap=g;}}
+ const rate=D.arr.length>1?(D.arr.length-1)/((f.a-D.arr[0])/1000):0;
+ const n1=x=>x.toLocaleString('it-IT',{maximumFractionDigits:1});
+ $('diag').textContent=n1(rate)+' fix/s · ritardo '+(D.lag==null?'—':n1(D.lag)+' s')+' · buchi '+D.gaps+(D.gaps?' (max '+n1(D.maxGap)+' s)':'');
+}
+
+/* Distanza dell'intervallo prev→f: Doppler integrato sugli orari dei fix (trapezio),
+   altrimenti corda tra le posizioni, altrimenti ultima velocità nota. */
+function intervalKm(prev,f,dt,chord){
+ if(prev.dop!==null&&f.dop!==null)return{km:(!prev.moving&&!f.moving)?0:(prev.v+f.v)/2*dt/1000,est:false};
+ if(chord!==null)return{km:(prev.moving||f.moving)?chord:0,est:false};
+ if(prev.v!==null)return{km:prev.moving?prev.v*dt/1000:0,est:true};
+ return{km:0,est:true};
+}
+
+function onGps(p){
+ const c=p.coords,a=performance.now(),t=p.timestamp||Date.now();
+ const acc=c.accuracy>0?c.accuracy:25;
+ const dop=(typeof c.speed==='number'&&isFinite(c.speed)&&c.speed>=0)?c.speed:null;
+ const f={t,a,lat:c.latitude,lon:c.longitude,acc,dop,v:dop,posOK:acc<=ACC_POS,moving:G.moving};
+ if(G.last&&t<=G.last.t){
+  if(++G.ign<15)return;                // doppione o consegna fuori ordine
+  G.last=null;                          // 15 fix di seguito "nel passato": l'orario dei fix è ripartito, si riparte da capo
+ }
+ if(G.last&&t-G.last.t>900000)G.last=null; // oltre 15 min senza fix: riparto da capo
+ if(!G.last){G.anchor=null;G.hist=[];G.kmA=0;}
+ G.ign=0;
+ const prev=G.last;
+ updLag(f);diagFix(f);
+ const dt=prev?(t-prev.t)/1000:0;
+ let chord=null;
+ if(prev&&prev.posOK&&f.posOK&&dt>0){
+  chord=hav(prev.lat,prev.lon,f.lat,f.lon);
+  if(chord*1000/dt>V_JUMP){f.posOK=false;chord=null;}   // salto impossibile: posizione scartata
+ }
+ // senza Doppler la velocità si ricava dallo spostamento su 2-6 s, con zona morta pari al rumore di posizione
+ if(f.dop===null&&f.posOK){
+  let ref=null;
+  for(const h of G.hist)if(t-h.t>=2000&&t-h.t<=6000)ref=h;
+  if(!ref&&prev&&chord!==null&&dt>.3&&dt<=5)ref=prev;
+  if(ref){const d=hav(ref.lat,ref.lon,f.lat,f.lon)*1000;f.v=d>Math.max(f.acc,ref.acc,3)*.8?d/((t-ref.t)/1000):0;}
+ }
+ if(f.posOK){G.hist.push(f);while(G.hist.length&&t-G.hist[0].t>6500)G.hist.shift();}
+ if(f.v!==null){
+  if(G.moving&&f.v<V_STOP)G.moving=false;else if(!G.moving&&f.v>V_MOVE)G.moving=true;
+  G.v=f.v;G.vs=G.vs==null?f.v:G.vs*.5+f.v*.5;
+  $('gpsV').textContent=Math.round(G.vs*3.6)+' km/h';
+ }
+ f.moving=G.moving;
+
+ if(prev&&dt>0){
+  const r=intervalKm(prev,f,dt,chord);let km=r.km,top=0;
+  // controllo a lungo raggio: la distanza in linea retta dall'ancora è un minimo del percorso.
+  // Se i km integrati sono meno (buco, Doppler assente o bloccato) si integra la differenza.
+  G.kmA+=km;
+  if(f.posOK){
+   if(!G.anchor){G.anchor=f;G.kmA=0;}
+   else{
+    const age=(t-G.anchor.t)/1000,chA=hav(G.anchor.lat,G.anchor.lon,f.lat,f.lon);
+    const tol=2*Math.hypot(G.anchor.acc,f.acc)/1000;
+    let lack=chA-tol-G.kmA;
+    if(G.kmA<.6*chA&&chA>1.5*tol)lack=chA-G.kmA;   // Doppler chiaramente carente: ci si fida della corda
+    if(lack>0){
+     const vmax=Math.max(prev.v||0,f.v||0,14)+2;
+     top=Math.max(0,Math.min(lack,vmax*age*1.1/1000-G.kmA));
+     km+=top;G.kmA+=top;
+    }
+    if(chA>ANCHOR_KM||age>20){G.anchor=f;G.kmA=0;}
+   }
+  }
+  // consolida l'intervallo [max(S.tc,prev.t), f.t]: dopo avvio o ripresa si prende solo la quota che cade dopo
+  if(S&&S.running&&!S.paused&&mode==='gps'){
+   const t0=Math.max(S.tc,prev.t),dtC=(t-t0)/1000;
+   if(dtC>0){
+    const kmC=(km-top)*Math.min(1,dtC/dt)+top;
+    advance(S,dtC,kmC);S.dead+=(dt>GAP_S||r.est)?kmC:top;S.tc=t;
+   }
+  }
+ }else if(f.posOK&&!G.anchor){G.anchor=f;G.kmA=0;}
+ G.last=f;G.aLast=a;
+
+ // stato a schermo
+ $('gpsAcc').textContent='±'+Math.round(acc)+' m';
+ if(!f.posOK){$('dot').style.background='var(--warn)';$('gpsStatus').textContent='Segnale debole: conto con la velocità Doppler';}
+ else{
+  $('dot').style.background='var(--ok)';
+  $('gpsStatus').textContent=(S&&S.running&&!G.moving)?'Fermo':'Rilevamento attivo';
+ }
+}
+function onGpsErr(e){
+ $('dot').style.background='var(--bad)';$('gpsAcc').textContent='';
+ const m=e&&e.message?' ['+e.message+']':'';
+ $('gpsStatus').textContent=(e.code===1?'Posizione non consentita: abilitala per questo sito nelle impostazioni del browser':e.code===3?'Nessun segnale GPS: vai all\'aperto':'Posizione non disponibile')+m;
+}
+function startWatch(){
+ if(!navigator.geolocation){onGpsErr({code:2});return;}
+ if(watchId==null)watchId=navigator.geolocation.watchPosition(onGps,onGpsErr,{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+}
+function stopWatch(){if(watchId!=null){navigator.geolocation.clearWatch(watchId);watchId=null;}}
+function resetGps(){G.hist=[];G.last=null;G.anchor=null;G.kmA=0;G.moving=false;G.v=0;G.vs=null;G.lag=0;G.lagWin=[];}
+
+$('mGps').onclick=()=>{mode='gps';$('mSim').classList.remove('on');$('mGps').classList.add('on');$('simBox').classList.add('hidden');$('gpsBox').classList.remove('hidden');startWatch();};
+$('mSim').onclick=()=>{mode='sim';$('mGps').classList.remove('on');$('mSim').classList.add('on');$('gpsBox').classList.add('hidden');$('simBox').classList.remove('hidden');stopWatch();resetGps();};
+
+/* ---------- corsa ---------- */
+function setCtl(on){['tariffa','fascia','aero','mSim','mGps'].forEach(id=>$(id).disabled=!on);}
+function startRide(band){
+ const now=performance.now();
+ if(mode==='gps'&&!(G.last&&(G.last.posOK||G.last.dop!==null)&&now-G.aLast<3000)){$('gpsStatus').textContent='Attendi il primo fix GPS prima di avviare';return;}
+ const k=$('tariffa').value,e0=T[k].start[band];
+ S={t:k,band,air:$('aero').value==='si',eur:e0,km:0,waitT:0,dead:0,t50:0,p2:false,elapsed:0,running:true,paused:false,pausedMs:0,pauseStart:0,t0:now,last:now,inizio:new Date(),tc:mode==='gps'?gpsNow():0,hEur:e0,hKm:0,hW:0};
+ G.anchor=(G.last&&G.last.posOK)?G.last:null;G.kmA=0;D.gaps=0;D.maxGap=0;
+ $('ricevuta').classList.add('hidden');setCtl(false);$('bAvvia').disabled=true;$('bPausa').disabled=false;$('bFine').disabled=false;$('bPausa').textContent='Pausa';
+ if('wakeLock'in navigator&&!wakeLock)toggleWake();
+ render();
+}
+$('bAvvia').onclick=()=>{const f=$('fascia').value;startRide(f==='auto'?autoBand():f);};
+$('bPausa').onclick=()=>{
+ if(!S||!S.running)return;const now=performance.now();
+ if(S.paused){ // riprendi: il conteggio riparte da adesso
+  S.pausedMs+=now-S.pauseStart;S.paused=false;S.last=now;
+  if(mode==='gps'&&G.last)S.tc=gpsNow();
+ }else{commitTail();S.paused=true;S.pauseStart=now;}
+ $('bPausa').textContent=S.paused?'Riprendi':'Pausa';
+};
+$('bFine').onclick=()=>{
+ if(!S||!S.running)return;
+ if(S.paused){S.pausedMs+=performance.now()-S.pauseStart;S.paused=false;}
+ else{S.elapsed=(performance.now()-S.t0-S.pausedMs)/1000;commitTail();}
+ S.running=false;
+ const t=T[S.t],disp=dispOf(S),tot=Math.max(disp,S.air?t.air:0);
+ const row=(l,v)=>'<div class="rrow"><span>'+l+'</span><span class="num">'+v+'</span></div>';
+ let h='<div style="font-weight:600;font-size:16px;margin-bottom:6px">Ricevuta di pagamento</div>';
+ h+=row('Tariffa',t.name+(S.t==='tc'?' · collettiva':''))+row('Fascia',BL[S.band])+row('Importo iniziale (bandierina)',fmt(t.start[S.band]))+row('Inizio',S.inizio.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'}))+row('Durata',fmtT(S.elapsed))+row('Percorso',fmtK(S.km)+' km')+(S.dead>0.05?row('· di cui stima GPS nei buchi',fmtK(S.dead)+' km'):'')+(S.waitT>=1?row('Sosta e rallentamenti',fmtT(S.waitT)):'')+row('Importo tassametro',fmt(disp));
+ if(tot>disp)h+=row('Adeguamento minimo aeroportuale',fmt(tot-disp));
+ h+='<div class="rtot"><span style="font-weight:600">Totale</span><b class="num">'+fmt(tot)+'</b></div><div class="hint">Esclusi pedaggi autostradali. Confronta riga per riga con la ricevuta cartacea: fascia, importo iniziale e km.</div><div class="btns" style="margin-top:12px"><button class="btn" id="bNuova">Nuova corsa</button></div>';
+ $('ricevuta').innerHTML=h;$('ricevuta').classList.remove('hidden');
+ setCtl(true);$('bAvvia').disabled=false;$('bPausa').disabled=true;$('bFine').disabled=true;
+ $('bNuova').onclick=()=>{S=null;$('fascia').value='auto';refreshAuto();$('ricevuta').classList.add('hidden');$('importo').textContent='€ 0,00';$('km').textContent='0,00 km';$('dur').textContent='0:00';$('sosta').textContent='0:00';$('scatti').textContent='0';$('stato').innerHTML='';};
+};
+
+/* ---------- velocità simulata ---------- */
+function setSim(v){simKmh=v;$('vlabel').textContent=v+' km/h';document.querySelectorAll('.chip[data-v]').forEach(c=>c.classList.toggle('on',+c.dataset.v===v));}
+$('vel').oninput=e=>setSim(+e.target.value);
+document.querySelectorAll('.chip[data-v]').forEach(c=>c.onclick=()=>{$('vel').value=c.dataset.v;setSim(+c.dataset.v);});
+
+/* ---------- schermo sempre acceso ---------- */
+function wlLabel(){$('bWake').textContent=wakeLock?'Schermo attivo ✓':'Schermo sempre attivo';$('bWake').style.borderColor=wakeLock?'var(--ok)':'';}
+async function toggleWake(){
+ if(wakeLock){try{await wakeLock.release();}catch(e){}wakeLock=null;wlLabel();return;}
+ try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;wlLabel();});}catch(e){wakeLock=null;}
+ wlLabel();
+}
+$('bWake').onclick=toggleWake;
+$('bWake').disabled=!('wakeLock'in navigator);wlLabel();
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden)return;
+ if(S&&S.running&&'wakeLock'in navigator&&!wakeLock)toggleWake();
+ if(mode==='gps'&&watchId!=null){stopWatch();startWatch();} // alcuni browser sospendono il GPS in background
+});
+
+refreshAuto();setInterval(refreshAuto,30000);
+startWatch();
+</script>
+</body>
+</html>
