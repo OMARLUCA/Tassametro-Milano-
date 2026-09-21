@@ -62,6 +62,11 @@ input[type=range]{width:100%;accent-color:var(--txt);height:28px}
 .mk{padding:6px 0;font-size:14px;line-height:1.4}
 .mk small{display:block;font-size:13px;color:var(--txt2);word-break:break-word}
 .mk a{color:var(--tagb)}
+.inp{font:inherit;font-size:16px;color:var(--txt);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px;width:100%}
+.rr{display:flex;gap:8px;margin-top:6px}
+.rr .inp{flex:1;min-width:0}
+.pv{padding:9px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.45}
+.pv small{display:block;font-size:13px;color:var(--txt2)}
 .hidden{display:none!important}
 details{font-size:12px;color:var(--txt3);line-height:1.6}
 details summary{cursor:pointer;color:var(--txt2);margin-bottom:6px}
@@ -134,6 +139,14 @@ details summary{cursor:pointer;color:var(--txt2);margin-bottom:6px}
 <div id="marcature" class="card hidden"><div class="hint" style="margin:0 0 4px">Posizioni segnate</div><div id="mkList"></div></div>
 
 <div id="ricevuta" class="card hidden"></div>
+
+<div id="prove" class="card hidden">
+  <div class="rowflex"><b id="pvTitolo" style="font-size:15px">Prove salvate</b><span class="hint" id="pvStat" style="margin:0"></span></div>
+  <div id="proveList"></div>
+  <div class="btns" style="margin-top:10px"><button class="btn" id="bShare">Condividi file</button><button class="btn" id="bCopia">Copia riepilogo</button></div>
+  <textarea class="inp hidden" id="pvTxt" rows="6" readonly style="margin-top:8px"></textarea>
+  <div class="hint" id="pvMsg"></div>
+</div>
 
 <details><summary>Note sulle tariffe</summary>
 Tariffa C: attivabile su richiesta all'inizio della corsa, per un minimo di tre persone con identico punto di partenza.
@@ -311,6 +324,7 @@ function intervalKm(prev,f,dt,chord){
 
 function onGps(p){
  const c=p.coords,a=performance.now(),t=p.timestamp||Date.now();
+ logFix(p,a,t);
  const acc=c.accuracy>0?c.accuracy:25;
  const dop=(typeof c.speed==='number'&&isFinite(c.speed)&&c.speed>=0)?c.speed:null;
  const f={t,a,lat:c.latitude,lon:c.longitude,acc,dop,v:dop,posOK:acc<=ACC_POS,moving:G.moving};
@@ -423,7 +437,7 @@ async function geocode(m,n){
   const via=[a.road||a.pedestrian||a.footway||a.square,a.house_number].filter(Boolean).join(' ');
   const citta=a.city||a.town||a.village||a.municipality;
   m.addr=[via,citta].filter(Boolean).join(', ')||String(j.display_name||'').split(',').slice(0,3).join(',').trim()||null;
-  renderMarks();
+  renderMarks();syncAddr(m);
  }catch(e){if(n<1)setTimeout(()=>geocode(m,n+1),15000);}
 }
 function marksHTML(){
@@ -448,13 +462,99 @@ $('bPresa').onclick=()=>{
  setTimeout(()=>{b.textContent='Presa cliente';b.disabled=!(S&&S.running&&mode==='gps');},1500);
 };
 
+/* ---------- prove salvate: confronto con il tassametro reale e registro sul telefono ---------- */
+const VER='2026-09-21c',LS_P='txprove',LOG_MAX=7200;
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
+const sgnE=n=>(n<0?'−':'+')+Math.abs(n).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const sgnP=n=>(n<0?'−':'+')+Math.abs(n).toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const parseEur=x=>{const v=parseFloat(String(x).trim().replace(',','.'));return isFinite(v)&&v>0&&v<1000?Math.round(v*100)/100:null;};
+const RB=[]; // ultime consegne GPS grezze: servono per poter rigiocare la corsa dall'inizio
+function compFix(r){return[Math.round(r[0]-S.t0),r[1]-S.gpsT0,+r[2].toFixed(6),+r[3].toFixed(6),Math.round(r[4]||0),r[5]===null?-1:+r[5].toFixed(2),Math.round(r[6])];}
+function logFix(p,a,t){
+ const c=p.coords;
+ const r=[a,t,c.latitude,c.longitude,c.accuracy,(typeof c.speed==='number'&&isFinite(c.speed)&&c.speed>=0)?c.speed:null,Date.now()-t];
+ RB.push(r);if(RB.length>12)RB.shift();
+ if(S&&S.running&&S.log&&S.log.fx.length<LOG_MAX)S.log.fx.push(compFix(r));
+}
+function salvaProva(){
+ if(mode!=='gps'||!S.log)return;
+ S.pid='p'+Date.now().toString(36);
+ const p={id:S.pid,ver:VER,inizio:S.inizio.toISOString(),tariffa:S.t,fascia:S.band,aero:S.air,importo:+dispOf(S).toFixed(2),reale:null,km:+S.km.toFixed(3),durata:Math.round(S.elapsed),sosta:Math.round(S.waitT),stima:+S.dead.toFixed(3),buchi:D.gaps,buchiMax:+D.maxGap.toFixed(1),ritardo:D.lag==null?null:+D.lag.toFixed(2),prog1:progOf(S)===1,
+  marks:S.marks.map(m=>({tipo:m.tipo,ora:m.ora.toISOString(),lat:m.p?m.p.lat:null,lon:m.p?m.p.lon:null,acc:m.p?Math.round(m.p.acc):null,addr:m.addr}))};
+ const L=lsGet(LS_P,[]);L.unshift(p);
+ const okLog=lsSet('txlog_'+p.id,{v:1,gps0:S.gpsT0,pre:S.log.pre,fx:S.log.fx,ev:S.log.ev});
+ if(!okLog)p.nolog=true;
+ if(!lsSet(LS_P,L)){S.pid=null;$('pvMsg').textContent='Memoria del telefono piena: questa prova non è stata salvata. Condividi il file e libera spazio.';}
+ try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
+ renderProve();
+}
+function setReale(id,v){const L=lsGet(LS_P,[]),p=L.find(x=>x.id===id);if(!p)return false;p.reale=v;return lsSet(LS_P,L);}
+function diffTxt(imp,real){const d=imp-real;return'Virtuale '+fmt(imp)+' · reale '+fmt(real)+' → differenza <b>'+sgnE(d)+'</b> ('+sgnP(d/real*100)+')';}
+function salvaReale(){
+ const v=parseEur($('reale').value);
+ if(v===null){$('rDiff').textContent='Scrivi un importo valido, per esempio 25,70';return;}
+ if(!S||!S.pid||!setReale(S.pid,v)){$('rDiff').textContent='Non riesco a salvare: la prova non è in memoria.';return;}
+ $('rDiff').innerHTML=diffTxt(dispOf(S),v);renderProve();
+}
+function dataProva(p){return new Date(p.inizio).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'});}
+function riga(p){
+ let r=dataProva(p)+' · '+BS[p.fascia]+' '+(p.tariffa==='tc'?'TC':'T1')+' · virtuale '+p.importo.toFixed(2).replace('.',',');
+ if(p.reale!=null)r+=' · reale '+p.reale.toFixed(2).replace('.',',')+' · '+sgnE(p.importo-p.reale)+' ('+sgnP((p.importo-p.reale)/p.reale*100)+')';
+ return r+' · '+fmtK(p.km)+' km · '+fmtT(p.durata)+' · sosta '+fmtT(p.sosta)+' · buchi '+p.buchi+(p.buchi?' (max '+Math.round(p.buchiMax)+' s)':'')+' · ver '+p.ver;
+}
+function renderProve(){
+ const L=lsGet(LS_P,[]);
+ $('prove').classList.toggle('hidden',!L.length);
+ if(!L.length)return;
+ const R=L.filter(p=>p.reale!=null);
+ const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+ $('pvTitolo').textContent='Prove salvate ('+L.length+')';
+ $('pvStat').textContent=R.length?'media '+sgnE(avg(R.map(p=>p.importo-p.reale)))+' ('+sgnP(avg(R.map(p=>(p.importo-p.reale)/p.reale*100)))+') su '+R.length:'';
+ $('proveList').innerHTML=L.slice(0,30).map(p=>{
+  const l1='<b>'+esc(dataProva(p))+'</b> · '+BS[p.fascia]+' '+(p.tariffa==='tc'?'TC':'T1');
+  const l2='<span class="num">virtuale '+fmt(p.importo)+(p.reale!=null?' · reale '+fmt(p.reale)+' · <b>'+sgnE(p.importo-p.reale)+'</b> ('+sgnP((p.importo-p.reale)/p.reale*100)+')':'')+'</span>';
+  const l3='<small>'+fmtK(p.km)+' km · '+fmtT(p.durata)+' · sosta '+fmtT(p.sosta)+' · buchi '+p.buchi+(p.buchi?' (max '+Math.round(p.buchiMax)+' s)':'')+(p.nolog?' · senza traccia GPS':'')+' · ver '+esc(p.ver)+'</small>';
+  const l4=p.reale==null?'<div class="rr"><input class="inp" data-id="'+esc(p.id)+'" inputmode="decimal" placeholder="importo reale, es. 25,70"><button class="btn" data-id="'+esc(p.id)+'">Salva</button></div>':'';
+  return'<div class="pv"><div>'+l1+'</div><div>'+l2+'</div>'+l3+l4+'</div>';
+ }).join('')+(L.length>30?'<div class="hint">…e altre '+(L.length-30)+': nel file condiviso ci sono tutte.</div>':'');
+}
+$('proveList').onclick=e=>{
+ const b=e.target.closest('button[data-id]');if(!b)return;
+ const id=b.dataset.id,inp=$('proveList').querySelector('input[data-id="'+id+'"]'),v=parseEur(inp?inp.value:'');
+ if(v===null){if(inp)inp.focus();return;}
+ setReale(id,v);renderProve();
+ if(S&&S.pid===id&&$('rDiff'))$('rDiff').innerHTML=diffTxt(dispOf(S),v);
+};
+function pvMsg(t){$('pvMsg').textContent=t;}
+async function copia(txt,ok){
+ try{await navigator.clipboard.writeText(txt);pvMsg(ok);$('pvTxt').classList.add('hidden');}
+ catch(e){$('pvTxt').value=txt;$('pvTxt').classList.remove('hidden');$('pvTxt').focus();$('pvTxt').select();pvMsg('Copia automatica non riuscita: tieni premuto sul testo e scegli Copia.');}
+}
+$('bCopia').onclick=()=>{const L=lsGet(LS_P,[]);if(L.length)copia(L.map(riga).join('\n'),'Riepilogo copiato: incollalo nella chat.');};
+$('bShare').onclick=async()=>{
+ const L=lsGet(LS_P,[]);if(!L.length)return;
+ const txt=JSON.stringify({app:'tassametro',esportato:new Date().toISOString(),prove:L.map(p=>Object.assign({},p,{log:lsGet('txlog_'+p.id,null)}))});
+ try{
+  const f=new File([txt],'prove-tassametro.json',{type:'application/json'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Prove tassametro'});pvMsg('');return;}
+ }catch(e){if(e&&e.name==='AbortError')return;}
+ copia(txt,'Il browser non condivide file: ho copiato tutto il testo.');
+};
+function syncAddr(m){
+ const L=lsGet(LS_P,[]);let ch=false;
+ for(const p of L)for(const k of p.marks||[])if(k.ora===m.ora.toISOString()&&k.tipo===m.tipo&&!k.addr&&m.addr){k.addr=m.addr;ch=true;}
+ if(ch)lsSet(LS_P,L);
+}
+
 /* ---------- corsa ---------- */
 function setCtl(on){['tariffa','fascia','aero','mSim','mGps'].forEach(id=>$(id).disabled=!on);}
 function startRide(band){
  const now=performance.now();
  if(mode==='gps'&&!(G.last&&(G.last.posOK||G.last.dop!==null)&&now-G.aLast<3000)){$('gpsStatus').textContent='Attendi il primo fix GPS prima di avviare';return;}
  const k=$('tariffa').value,e0=T[k].start[band];
- S={t:k,band,air:$('aero').value==='si',eur:e0,km:0,waitT:0,dead:0,t50:0,p2:false,elapsed:0,running:true,paused:false,pausedMs:0,pauseStart:0,t0:now,last:now,inizio:new Date(),tc:mode==='gps'?gpsNow():0,hEur:e0,hKm:0,hW:0,marks:[]};
+ S={t:k,band,air:$('aero').value==='si',eur:e0,km:0,waitT:0,dead:0,t50:0,p2:false,elapsed:0,running:true,paused:false,pausedMs:0,pauseStart:0,t0:now,last:now,inizio:new Date(),tc:mode==='gps'?gpsNow():0,hEur:e0,hKm:0,hW:0,marks:[],log:null,pid:null,gpsT0:0};
+ if(mode==='gps'&&G.last){S.gpsT0=G.last.t;S.log={fx:RB.map(compFix),ev:[],pre:RB.length};}
  G.anchor=(G.last&&G.last.posOK)?G.last:null;G.kmA=0;D.gaps=0;D.maxGap=0;
  $('ricevuta').classList.add('hidden');setCtl(false);$('bAvvia').disabled=true;$('bPausa').disabled=false;$('bFine').disabled=false;$('bPausa').textContent='Pausa';
  $('bPresa').disabled=(mode!=='gps');$('bPresa').textContent='Presa cliente';
@@ -464,6 +564,7 @@ function startRide(band){
 $('bAvvia').onclick=()=>{const f=$('fascia').value;startRide(f==='auto'?autoBand():f);};
 $('bPausa').onclick=()=>{
  if(!S||!S.running)return;const now=performance.now();
+ if(S.log)S.log.ev.push([Math.round(now-S.t0),S.paused?'r':'p']);
  if(S.paused){ // riprendi: il conteggio riparte da adesso
   S.pausedMs+=now-S.pauseStart;S.paused=false;S.last=now;
   if(mode==='gps'&&G.last)S.tc=gpsNow();
@@ -475,13 +576,16 @@ $('bFine').onclick=()=>{
  if(S.paused){S.pausedMs+=performance.now()-S.pauseStart;S.paused=false;}
  else{S.elapsed=(performance.now()-S.t0-S.pausedMs)/1000;commitTail();}
  S.running=false;marca('spe');
+ if(S.log)S.log.ev.push([Math.round(performance.now()-S.t0),'f']);
+ salvaProva();
  const t=T[S.t],disp=dispOf(S),tot=Math.max(disp,S.air?t.air:0);
  const row=(l,v)=>'<div class="rrow"><span>'+l+'</span><span class="num">'+v+'</span></div>';
  let h='<div style="font-weight:600;font-size:16px;margin-bottom:6px">Ricevuta di pagamento</div>';
  h+=row('Tariffa',t.name+(S.t==='tc'?' · collettiva':''))+row('Fascia',BL[S.band])+row('Importo iniziale (bandierina)',fmt(t.start[S.band]))+row('Inizio',S.inizio.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'}))+row('Durata',fmtT(S.elapsed))+row('Percorso',fmtK(S.km)+' km')+(S.dead>0.05?row('· di cui stima GPS nei buchi',fmtK(S.dead)+' km'):'')+(S.waitT>=1?row('Sosta e rallentamenti',fmtT(S.waitT)):'')+row('Importo tassametro',fmt(disp));
  if(tot>disp)h+=row('Adeguamento minimo aeroportuale',fmt(tot-disp));
- h+='<div class="rtot"><span style="font-weight:600">Totale</span><b class="num">'+fmt(tot)+'</b></div><div class="hint">Esclusi pedaggi autostradali. Confronta riga per riga con la ricevuta cartacea: fascia, importo iniziale e km.</div>'+(S.marks.length?'<div style="margin-top:12px;font-weight:600;font-size:14px">Posizioni segnate</div><div id="rMk"></div>':'')+'<div class="btns" style="margin-top:12px"><button class="btn" id="bNuova">Nuova corsa</button></div>';
+ h+='<div class="rtot"><span style="font-weight:600">Totale</span><b class="num">'+fmt(tot)+'</b></div><div class="hint">Esclusi pedaggi autostradali. Confronta riga per riga con la ricevuta cartacea: fascia, importo iniziale e km.</div>'+(S.pid?'<div style="margin-top:14px;font-weight:600;font-size:14px">Confronto con il tassametro reale</div><div class="rr"><input class="inp" id="reale" inputmode="decimal" placeholder="Importo sul tassametro reale, es. 25,70"><button class="btn" id="bReale">Salva</button></div><div class="hint" id="rDiff"></div>':'')+(S.marks.length?'<div style="margin-top:12px;font-weight:600;font-size:14px">Posizioni segnate</div><div id="rMk"></div>':'')+'<div class="btns" style="margin-top:12px"><button class="btn" id="bNuova">Nuova corsa</button></div>';
  $('ricevuta').innerHTML=h;$('ricevuta').classList.remove('hidden');renderMarks();
+ if(S.pid){$('bReale').onclick=salvaReale;$('reale').onkeydown=e=>{if(e.key==='Enter')salvaReale();};}
  setCtl(true);$('bAvvia').disabled=false;$('bPausa').disabled=true;$('bFine').disabled=true;$('bPresa').disabled=true;
  $('bNuova').onclick=()=>{S=null;$('fascia').value='auto';refreshAuto();$('ricevuta').classList.add('hidden');$('importo').textContent='€ 0,00';$('km').textContent='0,00 km';$('dur').textContent='0:00';$('sosta').textContent='0:00';$('scatti').textContent='0';$('stato').innerHTML='';};
 };
@@ -507,6 +611,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 refreshAuto();setInterval(refreshAuto,30000);
+renderProve();
 startWatch();
 </script>
 </body>
