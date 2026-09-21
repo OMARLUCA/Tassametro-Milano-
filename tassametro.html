@@ -25,7 +25,7 @@ header{display:flex;justify-content:space-between;align-items:baseline;margin-bo
 h1{font-size:17px;font-weight:600}
 header span{font-size:12px;color:var(--txt3);text-align:right}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
-.grid3{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}
+.grid2{display:grid;grid-template-columns:1.2fr 1fr;gap:8px}
 label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--txt3)}
 select{font:inherit;font-size:14px;color:var(--txt);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px}
 .lcd .imp{font-size:44px;font-weight:700;letter-spacing:.5px;font-variant-numeric:tabular-nums}
@@ -65,7 +65,17 @@ input[type=range]{width:100%;accent-color:var(--txt);height:28px}
 .inp{font:inherit;font-size:16px;color:var(--txt);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px;width:100%}
 .rr{display:flex;gap:8px;margin-top:6px}
 .rr .inp{flex:1;min-width:0}
-.pv{padding:9px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.45}
+.sw{position:relative;overflow:hidden;border-top:1px solid var(--line)}
+.sw .del{position:absolute;top:0;right:0;bottom:0;width:92px;border:0;background:var(--bad);color:#fff;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.sw .sl{position:relative;background:var(--card);transition:transform .2s ease;touch-action:pan-y}
+.sw .sl.drag{transition:none}
+.pv{padding:9px 0;font-size:14px;line-height:1.45}
+.btn.dng{background:var(--bad);border-color:var(--bad);color:#fff}
+#conf{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}
+#conf .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:360px;width:100%}
+#conf h2{font-size:16px;font-weight:600;margin-bottom:8px}
+#conf p{font-size:14px;color:var(--txt2)}
+#conf .btns{justify-content:flex-end;margin-top:14px}
 .pv small{display:block;font-size:13px;color:var(--txt2)}
 .hidden{display:none!important}
 details{font-size:12px;color:var(--txt3);line-height:1.6}
@@ -76,13 +86,11 @@ details summary{cursor:pointer;color:var(--txt2);margin-bottom:6px}
 
 <header><h1>Tassametro Milano</h1><span>tariffe luglio 2024 · solo corse a tassametro</span></header>
 
-<div class="card"><div class="grid3">
+<div class="card"><div class="grid2">
   <label class="f">Tariffa
     <select id="tariffa"><option value="t1">1 · convenzionale</option><option value="tc">C · collettiva</option></select></label>
   <label class="f">Fascia oraria
     <select id="fascia"><option value="auto">Auto</option><option value="f">Feriale 6–21</option><option value="fe">Festivo 6–21</option><option value="n">Notturna 21–6</option></select></label>
-  <label class="f">Aeroporto
-    <select id="aero"><option value="no">No</option><option value="si">Sì · minimo</option></select></label>
 </div></div>
 
 <div class="card lcd">
@@ -153,16 +161,23 @@ Tariffa C: attivabile su richiesta all'inizio della corsa, per un minimo di tre 
 1ª progressione: al raggiungimento di € 17,35 (Tariffa 1) o € 6,94 (Tariffa C) a tassametro.
 2ª progressione: velocità superiore a 50 km/h per più di 60 secondi; si annulla al di sotto dei 50 km/h.
 Sosta di attesa su richiesta: fino a 1 ora, deposito anticipato di € 34,48 (Tariffa 1).
-Tariffa minima da Malpensa, Linate o Orio al Serio: € 16,00 (Tariffa 1) · € 6,40 (Tariffa C). Importo esclusi pedaggi autostradali.
+Tariffa minima da Malpensa, Linate o Orio al Serio: € 16,00 (Tariffa 1) · € 6,40 (Tariffa C); il tassametro virtuale non la applica. Importo esclusi pedaggi autostradali.
 Come un tassametro fisico: sotto la velocità di cambio (circa 26 km/h) conta il tempo, sopra conta i metri; 1 scatto ogni 75,75 m oppure 10,44 s (Tariffa 1).
 Ogni fix GPS è datato al suo orario e l'importo è proiettato all'istante attuale, compensando il ritardo di consegna. Nei buchi di segnale si stima con l'ultima velocità nota e al rientro il tratto viene ricalcolato senza contarlo due volte.
 </details>
 
+<div id="conf" class="hidden"><div class="box">
+  <h2>Eliminare la prova?</h2>
+  <p id="confTxt"></p>
+  <p class="hint" style="margin-top:6px">Viene cancellata anche la traccia GPS. Non si può annullare.</p>
+  <div class="btns"><button class="btn" id="confNo">Annulla</button><button class="btn dng" id="confSi">Elimina</button></div>
+</div></div>
+
 <script>
 /* ---------- tariffe ---------- */
 const T={
- t1:{name:'Tariffa 1',scatto:.10,start:{f:4.10,fe:6.60,n:7.90},thr:17.35,air:16.00},
- tc:{name:'Tariffa C',scatto:.04,start:{f:1.64,fe:2.64,n:3.16},thr:6.94,air:6.40}};
+ t1:{name:'Tariffa 1',scatto:.10,start:{f:4.10,fe:6.60,n:7.90},thr:17.35},
+ tc:{name:'Tariffa C',scatto:.04,start:{f:1.64,fe:2.64,n:3.16},thr:6.94}};
 // costanti del tassametro: metri e secondi per scatto (base, 1ª, 2ª progressione)
 const SC=[{m:75.75,s:10.44},{m:50.50,s:6.96},{m:44.44,s:6.96}];
 
@@ -206,9 +221,9 @@ let S=null,mode='gps',watchId=null,wakeLock=null,simKmh=30;
 const G={last:null,anchor:null,kmA:0,moving:false,v:0,vs:null,aLast:0,hist:[],ign:0,lag:0,lagWin:[]};
 const D={arr:[],lag:null,maxGap:0,gaps:0};
 
-try{const s=JSON.parse(localStorage.getItem('txcfg')||'{}');if(s.t)$('tariffa').value=s.t;if(s.a)$('aero').value=s.a;}catch(e){}
-function saveCfg(){try{localStorage.setItem('txcfg',JSON.stringify({t:$('tariffa').value,a:$('aero').value}));}catch(e){}}
-['tariffa','fascia','aero'].forEach(id=>$(id).onchange=saveCfg);
+try{const s=JSON.parse(localStorage.getItem('txcfg')||'{}');if(s.t)$('tariffa').value=s.t;}catch(e){}
+function saveCfg(){try{localStorage.setItem('txcfg',JSON.stringify({t:$('tariffa').value}));}catch(e){}}
+['tariffa','fascia'].forEach(id=>$(id).onchange=saveCfg);
 
 /* ---------- tassametro (regole di un tassametro fisico) ---------- */
 function dispOf(X){const t=T[X.t];return Math.floor(X.eur/t.scatto+1e-6)*t.scatto;}
@@ -480,7 +495,7 @@ function logFix(p,a,t){
 function salvaProva(){
  if(mode!=='gps'||!S.log)return;
  S.pid='p'+Date.now().toString(36);
- const p={id:S.pid,ver:VER,inizio:S.inizio.toISOString(),tariffa:S.t,fascia:S.band,aero:S.air,importo:+dispOf(S).toFixed(2),reale:null,km:+S.km.toFixed(3),durata:Math.round(S.elapsed),sosta:Math.round(S.waitT),stima:+S.dead.toFixed(3),buchi:D.gaps,buchiMax:+D.maxGap.toFixed(1),ritardo:D.lag==null?null:+D.lag.toFixed(2),prog1:progOf(S)===1,
+ const p={id:S.pid,ver:VER,inizio:S.inizio.toISOString(),tariffa:S.t,fascia:S.band,importo:+dispOf(S).toFixed(2),reale:null,km:+S.km.toFixed(3),durata:Math.round(S.elapsed),sosta:Math.round(S.waitT),stima:+S.dead.toFixed(3),buchi:D.gaps,buchiMax:+D.maxGap.toFixed(1),ritardo:D.lag==null?null:+D.lag.toFixed(2),prog1:progOf(S)===1,
   marks:S.marks.map(m=>({tipo:m.tipo,ora:m.ora.toISOString(),lat:m.p?m.p.lat:null,lon:m.p?m.p.lon:null,acc:m.p?Math.round(m.p.acc):null,addr:m.addr}))};
  const L=lsGet(LS_P,[]);L.unshift(p);
  const okLog=lsSet('txlog_'+p.id,{v:1,gps0:S.gpsT0,pre:S.log.pre,fx:S.log.fx,ev:S.log.ev});
@@ -516,15 +531,64 @@ function renderProve(){
   const l2='<span class="num">virtuale '+fmt(p.importo)+(p.reale!=null?' · reale '+fmt(p.reale)+' · <b>'+sgnE(p.importo-p.reale)+'</b> ('+sgnP((p.importo-p.reale)/p.reale*100)+')':'')+'</span>';
   const l3='<small>'+fmtK(p.km)+' km · '+fmtT(p.durata)+' · sosta '+fmtT(p.sosta)+' · buchi '+p.buchi+(p.buchi?' (max '+Math.round(p.buchiMax)+' s)':'')+(p.nolog?' · senza traccia GPS':'')+' · ver '+esc(p.ver)+'</small>';
   const l4=p.reale==null?'<div class="rr"><input class="inp" data-id="'+esc(p.id)+'" inputmode="decimal" placeholder="importo reale, es. 25,70"><button class="btn" data-id="'+esc(p.id)+'">Salva</button></div>':'';
-  return'<div class="pv"><div>'+l1+'</div><div>'+l2+'</div>'+l3+l4+'</div>';
- }).join('')+(L.length>30?'<div class="hint">…e altre '+(L.length-30)+': nel file condiviso ci sono tutte.</div>':'');
+  return'<div class="sw"><button class="del" data-del="'+esc(p.id)+'" aria-label="Elimina prova">Elimina</button><div class="pv sl"><div>'+l1+'</div><div>'+l2+'</div>'+l3+l4+'</div></div>';
+ }).join('')+(L.length>30?'<div class="hint">…e altre '+(L.length-30)+': nel file condiviso ci sono tutte.</div>':'')+'<div class="hint">Scorri una prova verso sinistra per eliminarla.</div>';
+ $('proveList').querySelectorAll('.sl').forEach(agganciaSwipe);
 }
 $('proveList').onclick=e=>{
+ const d=e.target.closest('button[data-del]');if(d){apriConferma(d.dataset.del);return;}
+ const op=e.target.closest('.sl.open');if(op&&!e.target.closest('input,button')){chiudiRiga(op);return;}
  const b=e.target.closest('button[data-id]');if(!b)return;
  const id=b.dataset.id,inp=$('proveList').querySelector('input[data-id="'+id+'"]'),v=parseEur(inp?inp.value:'');
  if(v===null){if(inp)inp.focus();return;}
  setReale(id,v);renderProve();
  if(S&&S.pid===id&&$('rDiff'))$('rDiff').innerHTML=diffTxt(dispOf(S),v);
+};
+const DEL_W=92; // larghezza del pulsante Elimina che compare scorrendo
+let aperta=null,delId=null;
+function chiudiRiga(el){if(!el)return;el.style.transform='';el.classList.remove('open');if(aperta===el)aperta=null;}
+function agganciaSwipe(sl){
+ let x0=0,y0=0,base=0,cur=0,drag=false,pid=null;
+ sl.addEventListener('pointerdown',e=>{
+  if(e.target.closest('input,button,textarea,a'))return;
+  if(aperta&&aperta!==sl)chiudiRiga(aperta);
+  x0=e.clientX;y0=e.clientY;base=sl.classList.contains('open')?-DEL_W:0;cur=base;drag=false;pid=e.pointerId;
+ });
+ sl.addEventListener('pointermove',e=>{
+  if(pid===null||e.pointerId!==pid)return;
+  const dx=e.clientX-x0,dy=e.clientY-y0;
+  if(!drag){
+   if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){drag=true;sl.classList.add('drag');try{sl.setPointerCapture(pid);}catch(_){}}
+   else return;
+  }
+  cur=Math.max(-DEL_W,Math.min(0,base+dx));
+  sl.style.transform='translateX('+cur+'px)';
+ });
+ const fine=e=>{
+  if(pid===null||e.pointerId!==pid)return;
+  pid=null;if(!drag)return;
+  drag=false;sl.classList.remove('drag');
+  if(cur<-DEL_W/2){sl.style.transform='translateX('+(-DEL_W)+'px)';sl.classList.add('open');aperta=sl;}
+  else chiudiRiga(sl);
+ };
+ sl.addEventListener('pointerup',fine);sl.addEventListener('pointercancel',fine);
+}
+function apriConferma(id){
+ const p=lsGet(LS_P,[]).find(x=>x.id===id);if(!p)return;
+ delId=id;
+ $('confTxt').textContent=dataProva(p)+' · virtuale '+fmt(p.importo)+(p.reale!=null?' · reale '+fmt(p.reale):'')+' · '+fmtK(p.km)+' km';
+ $('conf').classList.remove('hidden');
+}
+function chiudiConferma(){$('conf').classList.add('hidden');delId=null;chiudiRiga(aperta);}
+$('confNo').onclick=chiudiConferma;
+$('conf').onclick=e=>{if(e.target===$('conf'))chiudiConferma();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('conf').classList.contains('hidden'))chiudiConferma();});
+$('confSi').onclick=()=>{
+ const id=delId;if(!id)return;
+ lsSet(LS_P,lsGet(LS_P,[]).filter(x=>x.id!==id));
+ try{localStorage.removeItem('txlog_'+id);}catch(e){}
+ if(S&&S.pid===id){S.pid=null;const r=$('reale');if(r){r.disabled=true;$('bReale').disabled=true;$('rDiff').textContent='Prova eliminata.';}}
+ aperta=null;chiudiConferma();renderProve();
 };
 function pvMsg(t){$('pvMsg').textContent=t;}
 async function copia(txt,ok){
@@ -548,12 +612,12 @@ function syncAddr(m){
 }
 
 /* ---------- corsa ---------- */
-function setCtl(on){['tariffa','fascia','aero','mSim','mGps'].forEach(id=>$(id).disabled=!on);}
+function setCtl(on){['tariffa','fascia','mSim','mGps'].forEach(id=>$(id).disabled=!on);}
 function startRide(band){
  const now=performance.now();
  if(mode==='gps'&&!(G.last&&(G.last.posOK||G.last.dop!==null)&&now-G.aLast<3000)){$('gpsStatus').textContent='Attendi il primo fix GPS prima di avviare';return;}
  const k=$('tariffa').value,e0=T[k].start[band];
- S={t:k,band,air:$('aero').value==='si',eur:e0,km:0,waitT:0,dead:0,t50:0,p2:false,elapsed:0,running:true,paused:false,pausedMs:0,pauseStart:0,t0:now,last:now,inizio:new Date(),tc:mode==='gps'?gpsNow():0,hEur:e0,hKm:0,hW:0,marks:[],log:null,pid:null,gpsT0:0};
+ S={t:k,band,eur:e0,km:0,waitT:0,dead:0,t50:0,p2:false,elapsed:0,running:true,paused:false,pausedMs:0,pauseStart:0,t0:now,last:now,inizio:new Date(),tc:mode==='gps'?gpsNow():0,hEur:e0,hKm:0,hW:0,marks:[],log:null,pid:null,gpsT0:0};
  if(mode==='gps'&&G.last){S.gpsT0=G.last.t;S.log={fx:RB.map(compFix),ev:[],pre:RB.length};}
  G.anchor=(G.last&&G.last.posOK)?G.last:null;G.kmA=0;D.gaps=0;D.maxGap=0;
  $('ricevuta').classList.add('hidden');setCtl(false);$('bAvvia').disabled=true;$('bPausa').disabled=false;$('bFine').disabled=false;$('bPausa').textContent='Pausa';
@@ -578,11 +642,10 @@ $('bFine').onclick=()=>{
  S.running=false;marca('spe');
  if(S.log)S.log.ev.push([Math.round(performance.now()-S.t0),'f']);
  salvaProva();
- const t=T[S.t],disp=dispOf(S),tot=Math.max(disp,S.air?t.air:0);
+ const t=T[S.t],disp=dispOf(S),tot=disp;
  const row=(l,v)=>'<div class="rrow"><span>'+l+'</span><span class="num">'+v+'</span></div>';
  let h='<div style="font-weight:600;font-size:16px;margin-bottom:6px">Ricevuta di pagamento</div>';
  h+=row('Tariffa',t.name+(S.t==='tc'?' · collettiva':''))+row('Fascia',BL[S.band])+row('Importo iniziale (bandierina)',fmt(t.start[S.band]))+row('Inizio',S.inizio.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'}))+row('Durata',fmtT(S.elapsed))+row('Percorso',fmtK(S.km)+' km')+(S.dead>0.05?row('· di cui stima GPS nei buchi',fmtK(S.dead)+' km'):'')+(S.waitT>=1?row('Sosta e rallentamenti',fmtT(S.waitT)):'')+row('Importo tassametro',fmt(disp));
- if(tot>disp)h+=row('Adeguamento minimo aeroportuale',fmt(tot-disp));
  h+='<div class="rtot"><span style="font-weight:600">Totale</span><b class="num">'+fmt(tot)+'</b></div><div class="hint">Esclusi pedaggi autostradali. Confronta riga per riga con la ricevuta cartacea: fascia, importo iniziale e km.</div>'+(S.pid?'<div style="margin-top:14px;font-weight:600;font-size:14px">Confronto con il tassametro reale</div><div class="rr"><input class="inp" id="reale" inputmode="decimal" placeholder="Importo sul tassametro reale, es. 25,70"><button class="btn" id="bReale">Salva</button></div><div class="hint" id="rDiff"></div>':'')+(S.marks.length?'<div style="margin-top:12px;font-weight:600;font-size:14px">Posizioni segnate</div><div id="rMk"></div>':'')+'<div class="btns" style="margin-top:12px"><button class="btn" id="bNuova">Nuova corsa</button></div>';
  $('ricevuta').innerHTML=h;$('ricevuta').classList.remove('hidden');renderMarks();
  if(S.pid){$('bReale').onclick=salvaReale;$('reale').onkeydown=e=>{if(e.key==='Enter')salvaReale();};}
