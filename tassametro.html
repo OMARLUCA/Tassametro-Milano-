@@ -59,6 +59,9 @@ input[type=range]{width:100%;accent-color:var(--txt);height:28px}
 .rrow .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .rtot{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:8px;padding-top:10px}
 .rtot b{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.mk{padding:6px 0;font-size:14px;line-height:1.4}
+.mk small{display:block;font-size:13px;color:var(--txt2);word-break:break-word}
+.mk a{color:var(--tagb)}
 .hidden{display:none!important}
 details{font-size:12px;color:var(--txt3);line-height:1.6}
 details summary{cursor:pointer;color:var(--txt2);margin-bottom:6px}
@@ -122,10 +125,13 @@ details summary{cursor:pointer;color:var(--txt2);margin-bottom:6px}
 
 <div class="card btns">
   <button class="btn p" id="bAvvia"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>Avvia corsa</button>
+  <button class="btn" id="bPresa" disabled>Presa cliente</button>
   <button class="btn" id="bPausa" disabled>Pausa</button>
   <button class="btn" id="bFine" disabled>Fine corsa</button>
   <button class="btn" id="bWake">Schermo sempre attivo</button>
 </div>
+
+<div id="marcature" class="card hidden"><div class="hint" style="margin:0 0 4px">Posizioni segnate</div><div id="mkList"></div></div>
 
 <div id="ricevuta" class="card hidden"></div>
 
@@ -217,8 +223,11 @@ function gpsNow(){return G.last.t+(performance.now()-G.aLast)+G.lag*1000;}
 function view(){
  const X=Object.assign({},S);X.tailKm=0;X.tailDt=0;
  if(mode==='gps'&&S.running&&!S.paused&&G.last){
-  const dt=Math.min((gpsNow()-S.tc)/1000,$('cDead').checked?EXTRAP_MAX:GAP_S);
-  if(dt>0){const km=(G.moving?G.v:0)*dt/1000;advance(X,dt,km);X.tailKm=km;X.tailDt=dt;}
+  const v=G.moving?G.v:0,lento=v*3.6<vcambio(progOf(S));
+  // fermo o lento il tempo continua a correre anche senza fix, come in un tassametro vero;
+  // in marcia veloce si proietta l'ultima velocità per al massimo EXTRAP_MAX secondi
+  const dt=Math.max(0,(gpsNow()-S.tc)/1000),dtC=lento?dt:Math.min(dt,$('cDead').checked?EXTRAP_MAX:GAP_S);
+  if(dtC>0){const km=v*Math.min(dtC,EXTRAP_MAX)/1000;advance(X,dtC,km);X.tailKm=km;X.tailDt=dtC;}
  }
  // un tassametro non torna mai indietro
  if(X.eur<S.hEur)X.eur=S.hEur;else S.hEur=X.eur;
@@ -246,7 +255,7 @@ function render(){
  if(X.p2)h+='<span class="tag w">2ª progressione · >50 km/h</span>';
  else if(pr)h+='<span class="tag b">1ª progressione</span>';
  else h+='<span class="tag">Tariffa base</span>';
- if(mode==='gps'&&S.running&&G.last&&(performance.now()-G.aLast)/1000>GAP_S)h+='<span class="tag w">stima: nessun fix</span>';
+ if(mode==='gps'&&S.running&&G.last&&G.moving&&(performance.now()-G.aLast)/1000>GAP_S)h+='<span class="tag w">stima: nessun fix</span>';
  $('stato').innerHTML=h;
  const k=X.p2?2:pr;
  $('scattoInfo').textContent='1 scatto da '+fmt(t.scatto)+' ogni '+SC[k].m.toLocaleString('it-IT')+' m sopra '+vcambio(pr).toLocaleString('it-IT',{maximumFractionDigits:1})+' km/h o '+SC[pr].s.toLocaleString('it-IT')+' s sotto';
@@ -265,7 +274,7 @@ function tick(){
 setInterval(tick,100);
 
 function gapStatus(now){
- if(!G.last)return;
+ if(!G.last||!G.moving)return;
  const wall=(now-G.aLast)/1000;
  if(wall<=GAP_S)return;
  $('dot').style.background=wall>EXTRAP_MAX?'var(--bad)':'var(--warn)';
@@ -306,8 +315,8 @@ function onGps(p){
  const dop=(typeof c.speed==='number'&&isFinite(c.speed)&&c.speed>=0)?c.speed:null;
  const f={t,a,lat:c.latitude,lon:c.longitude,acc,dop,v:dop,posOK:acc<=ACC_POS,moving:G.moving};
  if(G.last&&t<=G.last.t){
-  if(++G.ign<15)return;                // doppione o consegna fuori ordine
-  G.last=null;                          // 15 fix di seguito "nel passato": l'orario dei fix è ripartito, si riparte da capo
+  if(G.last.t-t>30000&&++G.ign>=5)G.last=null; // l'orario dei fix è ripartito molto indietro: si riparte da capo
+  else return;                                  // doppione o consegna fuori ordine
  }
  if(G.last&&t-G.last.t>900000)G.last=null; // oltre 15 min senza fix: riparto da capo
  if(!G.last){G.anchor=null;G.hist=[];G.kmA=0;}
@@ -337,6 +346,7 @@ function onGps(p){
 
  if(prev&&dt>0){
   const r=intervalKm(prev,f,dt,chord);let km=r.km,top=0;
+  if(chord!==null&&dt>GAP_S)km=Math.min(km,chord*1.4+2*Math.hypot(prev.acc,f.acc)/1000); // da fermi non si accumulano metri fantasma
   // controllo a lungo raggio: la distanza in linea retta dall'ancora è un minimo del percorso.
   // Se i km integrati sono meno (buco, Doppler assente o bloccato) si integra la differenza.
   G.kmA+=km;
@@ -389,17 +399,67 @@ function resetGps(){G.hist=[];G.last=null;G.anchor=null;G.kmA=0;G.moving=false;G
 $('mGps').onclick=()=>{mode='gps';$('mSim').classList.remove('on');$('mGps').classList.add('on');$('simBox').classList.add('hidden');$('gpsBox').classList.remove('hidden');startWatch();};
 $('mSim').onclick=()=>{mode='sim';$('mGps').classList.remove('on');$('mSim').classList.add('on');$('gpsBox').classList.add('hidden');$('simBox').classList.remove('hidden');stopWatch();resetGps();};
 
+/* ---------- posizioni segnate (accensione, presa cliente, spegnimento) ---------- */
+const MK_NOME={acc:'Accensione',presa:'Presa cliente',spe:'Spegnimento'};
+const esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function posNow(){ // ultima posizione GPS nota
+ if(mode!=='gps'||!G.last)return null;
+ return{lat:G.last.lat,lon:G.last.lon,acc:G.last.acc,age:(performance.now()-G.aLast)/1000+G.lag};
+}
+function marca(tipo){
+ if(!S||mode!=='gps')return;
+ const m={tipo,ora:new Date(),p:posNow(),addr:null};
+ S.marks.push(m);renderMarks();
+ if(m.p)geocode(m,0);
+}
+// indirizzo da OpenStreetMap: serve internet, senza rete restano le coordinate
+async function geocode(m,n){
+ try{
+  const c=new AbortController(),to=setTimeout(()=>c.abort(),8000);
+  const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&accept-language=it&lat='+m.p.lat.toFixed(6)+'&lon='+m.p.lon.toFixed(6),{signal:c.signal});
+  clearTimeout(to);
+  if(!r.ok)throw new Error('http');
+  const j=await r.json(),a=j.address||{};
+  const via=[a.road||a.pedestrian||a.footway||a.square,a.house_number].filter(Boolean).join(' ');
+  const citta=a.city||a.town||a.village||a.municipality;
+  m.addr=[via,citta].filter(Boolean).join(', ')||String(j.display_name||'').split(',').slice(0,3).join(',').trim()||null;
+  renderMarks();
+ }catch(e){if(n<1)setTimeout(()=>geocode(m,n+1),15000);}
+}
+function marksHTML(){
+ if(!S||!S.marks||!S.marks.length)return'';
+ return S.marks.map(m=>{
+  const h=m.ora.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Rome'});
+  let d='posizione non disponibile';
+  if(m.p){
+   d=(m.addr?esc(m.addr)+' · ':'')+'<span class="num">'+m.p.lat.toFixed(5)+', '+m.p.lon.toFixed(5)+'</span> · ±'+Math.round(m.p.acc)+' m'+(m.p.age>5?' · posizione di '+Math.round(m.p.age)+' s fa':'')+' · <a href="https://www.google.com/maps?q='+m.p.lat+','+m.p.lon+'" target="_blank" rel="noopener">mappa</a>';
+  }
+  return'<div class="mk"><b>'+MK_NOME[m.tipo]+'</b> <span class="num">'+h+'</span><small>'+d+'</small></div>';
+ }).join('');
+}
+function renderMarks(){
+ const h=marksHTML();
+ $('mkList').innerHTML=h;$('marcature').classList.toggle('hidden',!h||!S||!S.running);
+ const r=$('rMk');if(r)r.innerHTML=h;
+}
+$('bPresa').onclick=()=>{
+ if(!S||!S.running||mode!=='gps')return;
+ marca('presa');const b=$('bPresa');b.textContent='Segnato ✓';b.disabled=true;
+ setTimeout(()=>{b.textContent='Presa cliente';b.disabled=!(S&&S.running&&mode==='gps');},1500);
+};
+
 /* ---------- corsa ---------- */
 function setCtl(on){['tariffa','fascia','aero','mSim','mGps'].forEach(id=>$(id).disabled=!on);}
 function startRide(band){
  const now=performance.now();
  if(mode==='gps'&&!(G.last&&(G.last.posOK||G.last.dop!==null)&&now-G.aLast<3000)){$('gpsStatus').textContent='Attendi il primo fix GPS prima di avviare';return;}
  const k=$('tariffa').value,e0=T[k].start[band];
- S={t:k,band,air:$('aero').value==='si',eur:e0,km:0,waitT:0,dead:0,t50:0,p2:false,elapsed:0,running:true,paused:false,pausedMs:0,pauseStart:0,t0:now,last:now,inizio:new Date(),tc:mode==='gps'?gpsNow():0,hEur:e0,hKm:0,hW:0};
+ S={t:k,band,air:$('aero').value==='si',eur:e0,km:0,waitT:0,dead:0,t50:0,p2:false,elapsed:0,running:true,paused:false,pausedMs:0,pauseStart:0,t0:now,last:now,inizio:new Date(),tc:mode==='gps'?gpsNow():0,hEur:e0,hKm:0,hW:0,marks:[]};
  G.anchor=(G.last&&G.last.posOK)?G.last:null;G.kmA=0;D.gaps=0;D.maxGap=0;
  $('ricevuta').classList.add('hidden');setCtl(false);$('bAvvia').disabled=true;$('bPausa').disabled=false;$('bFine').disabled=false;$('bPausa').textContent='Pausa';
+ $('bPresa').disabled=(mode!=='gps');$('bPresa').textContent='Presa cliente';
  if('wakeLock'in navigator&&!wakeLock)toggleWake();
- render();
+ render();marca('acc');
 }
 $('bAvvia').onclick=()=>{const f=$('fascia').value;startRide(f==='auto'?autoBand():f);};
 $('bPausa').onclick=()=>{
@@ -414,15 +474,15 @@ $('bFine').onclick=()=>{
  if(!S||!S.running)return;
  if(S.paused){S.pausedMs+=performance.now()-S.pauseStart;S.paused=false;}
  else{S.elapsed=(performance.now()-S.t0-S.pausedMs)/1000;commitTail();}
- S.running=false;
+ S.running=false;marca('spe');
  const t=T[S.t],disp=dispOf(S),tot=Math.max(disp,S.air?t.air:0);
  const row=(l,v)=>'<div class="rrow"><span>'+l+'</span><span class="num">'+v+'</span></div>';
  let h='<div style="font-weight:600;font-size:16px;margin-bottom:6px">Ricevuta di pagamento</div>';
  h+=row('Tariffa',t.name+(S.t==='tc'?' · collettiva':''))+row('Fascia',BL[S.band])+row('Importo iniziale (bandierina)',fmt(t.start[S.band]))+row('Inizio',S.inizio.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'}))+row('Durata',fmtT(S.elapsed))+row('Percorso',fmtK(S.km)+' km')+(S.dead>0.05?row('· di cui stima GPS nei buchi',fmtK(S.dead)+' km'):'')+(S.waitT>=1?row('Sosta e rallentamenti',fmtT(S.waitT)):'')+row('Importo tassametro',fmt(disp));
  if(tot>disp)h+=row('Adeguamento minimo aeroportuale',fmt(tot-disp));
- h+='<div class="rtot"><span style="font-weight:600">Totale</span><b class="num">'+fmt(tot)+'</b></div><div class="hint">Esclusi pedaggi autostradali. Confronta riga per riga con la ricevuta cartacea: fascia, importo iniziale e km.</div><div class="btns" style="margin-top:12px"><button class="btn" id="bNuova">Nuova corsa</button></div>';
- $('ricevuta').innerHTML=h;$('ricevuta').classList.remove('hidden');
- setCtl(true);$('bAvvia').disabled=false;$('bPausa').disabled=true;$('bFine').disabled=true;
+ h+='<div class="rtot"><span style="font-weight:600">Totale</span><b class="num">'+fmt(tot)+'</b></div><div class="hint">Esclusi pedaggi autostradali. Confronta riga per riga con la ricevuta cartacea: fascia, importo iniziale e km.</div>'+(S.marks.length?'<div style="margin-top:12px;font-weight:600;font-size:14px">Posizioni segnate</div><div id="rMk"></div>':'')+'<div class="btns" style="margin-top:12px"><button class="btn" id="bNuova">Nuova corsa</button></div>';
+ $('ricevuta').innerHTML=h;$('ricevuta').classList.remove('hidden');renderMarks();
+ setCtl(true);$('bAvvia').disabled=false;$('bPausa').disabled=true;$('bFine').disabled=true;$('bPresa').disabled=true;
  $('bNuova').onclick=()=>{S=null;$('fascia').value='auto';refreshAuto();$('ricevuta').classList.add('hidden');$('importo').textContent='€ 0,00';$('km').textContent='0,00 km';$('dur').textContent='0:00';$('sosta').textContent='0:00';$('scatti').textContent='0';$('stato').innerHTML='';};
 };
 
